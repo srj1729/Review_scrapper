@@ -4,6 +4,8 @@ import requests
 from bs4 import BeautifulSoup as bs
 from urllib.request import urlopen as uReq
 import logging
+import pymongo
+
 logging.basicConfig(filename="scrapper.log" , level=logging.INFO)
 
 app = Flask(__name__)
@@ -17,20 +19,20 @@ def index():
     if request.method == 'POST':
         try:
             searchString = request.form['content'].replace(" ","")
-            flipkart_url = "https://www.flipkart.com/search?q=" + searchString
-            uClient = uReq(flipkart_url)
-            flipkartPage = uClient.read()
-            uClient.close()
-            flipkart_html = bs(flipkartPage, "html.parser")
-            bigboxes = flipkart_html.findAll("div", {"class": "_1AtVbE col-12-12"})
-            del bigboxes[0:3]
-            box = bigboxes[0]
+            flip_url = "https://www.flipkart.com/search?q=" + searchString
+            urlclient=uReq(flip_url)
+            flip_page=urlclient.read()
+            urlclient.close()
+            flip_html=bs(flip_page,'html.parser')
+            bigbox=flip_html.find_all("div",{"class","_1AtVbE col-12-12"})
+            del bigbox[0:2]
+            box = bigbox[3]
             productLink = "https://www.flipkart.com" + box.div.div.div.a['href']
             prodRes = requests.get(productLink)
             prodRes.encoding='utf-8'
             prod_html = bs(prodRes.text, "html.parser")
             print(prod_html)
-            commentboxes = prod_html.find_all('div', {'class': "_16PBlm"})
+            commentboxes = prod_html.find_all("div",{"class":"_16PBlm"})
 
             filename = searchString + ".csv"
             fw = open(filename, "w")
@@ -72,6 +74,12 @@ def index():
                           "Comment": custComment}
                 reviews.append(mydict)
             logging.info("log my final result {}".format(reviews))
+
+            client = pymongo.MongoClient("mongodb+srv://abc123:123abc@cluster0.avf5chi.mongodb.net/?retryWrites=true&w=majority")
+            db=client['reviews']
+            col=db['review_data']
+            col.insert_many(reviews) 
+
             return render_template('result.html', reviews=reviews[0:(len(reviews)-1)])
         except Exception as e:
             logging.info(e)
@@ -84,3 +92,4 @@ def index():
 
 if __name__=="__main__":
     app.run(host="0.0.0.0")
+
